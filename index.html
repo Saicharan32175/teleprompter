@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<!--
+  Voice Teleprompter - single file app. No build step, no dependencies.
+  GitHub Pages: save as index.html in your repo root, then Settings > Pages > Deploy from branch (main, /root).
+  Open the https://<user>.github.io/<repo>/ link in Chrome (desktop or Android) and allow the microphone.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voice Teleprompter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0e1116;--panel:#171b23;--read:#4b5566;--ahead:#e9edf4;--live:#ffd166;--cue:#7cc4ff;--ok:#4ade80;--bad:#ff7b72;--line:#262c38;--fs:44px}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ahead);font-family:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+header{position:fixed;top:0;left:0;right:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#sec{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#st{font-size:12px;color:var(--read);white-space:nowrap}
+#st.ok{color:var(--ok)}#st.bad{color:var(--bad)}
+#clock{font-size:15px;color:var(--live);white-space:nowrap}
+#bar{height:3px;background:var(--line);margin-top:8px;border-radius:2px;overflow:hidden}
+#bar i{display:block;height:100%;width:0;background:var(--live);transition:width .2s}
+#stage{padding:96px 22px 55vh;max-width:900px;margin:0 auto}
+.sechead{margin:60vh 0 22px;color:var(--cue);font-size:15px;font-weight:700}
+.sechead:first-child{margin-top:34vh}
+.sechead span{display:block;color:var(--read);font-weight:500;margin-top:2px}
+.line{font-size:var(--fs);line-height:1.32;font-weight:700;margin:0 0 .55em;opacity:.55;transition:opacity .1s;cursor:pointer}
+.line.active{opacity:1}
+.w.read{color:var(--read)}.w.cur{color:var(--live)}
+.cue{display:inline-block;margin:6px 0 26px;padding:6px 12px;border:1px dashed var(--cue);border-radius:6px;color:var(--cue);font-size:16px;font-weight:500}
+.mirror #stage{transform:scaleX(-1)}
+footer{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--panel);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+#heard{font-size:13px;color:var(--read);min-height:18px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-weight:700;font-size:14px;color:var(--ahead);background:#222937;border:1px solid var(--line);border-radius:8px;padding:9px 13px;cursor:pointer}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--live);outline-offset:2px}
+button.on{background:var(--live);color:#14171d;border-color:var(--live)}
+#go{background:#2f9e6b;border-color:#2f9e6b;min-width:92px}
+#go.run{background:#d9534f;border-color:#d9534f}
+label{font-size:13px;color:var(--read);display:flex;align-items:center;gap:6px}
+input[type=range]{width:90px;accent-color:var(--live)}
+#note{font-size:12px;color:var(--live);margin-top:6px;min-height:16px}
+dialog{background:var(--panel);color:var(--ahead);border:1px solid var(--line);border-radius:12px;width:min(720px,94vw);padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+textarea{width:100%;height:50vh;background:#0b0e13;color:var(--ahead);border:1px solid var(--line);border-radius:8px;padding:10px;font:14px/1.5 "JetBrains Mono",ui-monospace,monospace;resize:vertical}
+dialog p{font-size:13px;color:var(--read);margin:0 0 10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="row"><div id="sec">Ready</div><div id="st" class="mono">Mic idle</div><div id="clock" class="mono">0:00 / 5:00</div></div>
+  <div id="bar"><i></i></div>
+</header>
+<main id="stage"></main>
+<footer>
+  <div id="heard">Press Start, then read aloud. The lines follow your voice.</div>
+  <div class="ctl">
+    <button id="go">Start</button>
+    <button id="mVoice" class="on">Voice</button>
+    <button id="mAuto">Auto</button>
+    <button id="minus" aria-label="Smaller text">A−</button>
+    <button id="plus" aria-label="Larger text">A+</button>
+    <button id="mir">Mirror</button>
+    <button id="rst">Reset</button>
+    <button id="edit">Edit script</button>
+    <label id="spd" hidden>Pace <input id="wpm" type="range" min="100" max="260" value="170"><span id="wv" class="mono">170</span></label>
+  </div>
+  <div id="note"></div>
+</footer>
+
+<dialog id="ed">
+  <p>One sentence per line. Start a section with <b>#</b> (optionally <b>| 0:00 – 0:40</b>). Wrap a screen cue in <b>[square brackets]</b>.</p>
+  <textarea id="src" spellcheck="false"></textarea>
+  <div class="ctl" style="margin-top:10px">
+    <button id="save" class="on">Save and use</button>
+    <button id="def">Restore Recruit CRM script</button>
+    <button id="close">Close</button>
+  </div>
+</dialog>
+
+<script>
+const DEFAULT_SCRIPT = `# Introduction | 0:00 – 0:40
+Good morning, everyone.
+Today, I am going to explain two useful features of Recruit CRM: the AI Candidate Summary Generator and Sequencing.
+Before we get into the features, let us first understand what Recruit CRM actually does.
+Recruit CRM is a platform that helps companies and recruitment agencies manage their hiring process.
+It brings candidate details, resumes, job openings, and communication together in one place.
+Now, let us see how these two features make a recruiter’s daily work easier.
+# AI Candidate Summary Generator | 0:40 – 2:30
+Let us begin with the AI Candidate Summary Generator.
+Imagine you are a recruiter at a software company, and you have received 100 resumes for a Java Developer position.
+Going through every resume one by one, checking skills, experience, and qualifications, takes a great deal of time.
+And sometimes, with so many resumes to review, recruiters may even miss important details.
+To solve this problem, Recruit CRM provides the AI Candidate Summary Generator.
+This feature uses AI to create a short, easy-to-understand summary of a candidate’s profile, using the information already available.
+[Show the candidate profile on screen]
+For example, suppose a candidate has two years of experience in Java, Spring Boot, MySQL, and REST APIs.
+Instead of reading the complete resume every time, the recruiter can use the AI-generated summary to quickly understand the candidate’s background, skills, and experience.
+This makes the screening process much easier.
+Here is another example. Suppose a recruiter needs to compare two candidates for the same position.
+One candidate may have more experience in Java, while the other may have stronger knowledge of databases.
+The summary helps the recruiter quickly identify these differences and decide which candidate should move on to the next round.
+The main advantage of this feature is that it saves time, reduces manual work, and helps recruiters understand candidate profiles more easily.
+Of course, the recruiter should still verify the information against the original resume before making a final decision.
+# Sequencing | 2:30 – 4:30
+Now, let us move on to our second feature: Sequencing.
+We all know that communication is very important in recruitment.
+Imagine a recruiter finds a suitable candidate for a software developer position and sends an email asking whether the candidate is interested in an interview.
+But what happens if the candidate does not reply?
+The recruiter has to remember to send another email after some time.
+And when they are handling 50 or 100 candidates, following up with everyone manually becomes very difficult.
+This is where Sequencing becomes useful.
+Sequencing helps recruiters organize a series of follow-up communications and automate scheduled emails.
+[Show the Sequencing feature on screen]
+For example, a recruiter can plan a simple three-step email sequence.
+First, send an email introducing the job opportunity.
+Second, if the candidate does not respond, send a follow-up email after two days.
+Third, send another reminder after a few more days, if appropriate.
+This way, recruiters do not have to remember every follow-up manually.
+Let us take one more example. Suppose a company is hiring 20 software developers.
+The recruiter has to contact many candidates and keep track of their responses.
+Using Sequencing, the recruiter can organize the whole communication process and save time, instead of sending every follow-up individually.
+This helps recruiters stay connected with candidates and reduces the chances of missing important follow-ups.
+The main benefits are better communication, less manual work, and more organized recruitment.
+# Conclusion | 4:30 – 5:00
+So, to conclude, these are the two features I wanted to explain today.
+The AI Candidate Summary Generator helps recruiters understand candidate profiles quickly, while Sequencing helps them manage follow-up communication more efficiently.
+In other words, AI helps recruiters identify suitable candidates faster, and Sequencing helps them stay connected with those candidates.
+Both features reduce manual work and make the recruitment process smoother.
+That is all from my side. Thank you for your time!`;
+
+const $ = i => document.getElementById(i);
+const norm = w => w.toLowerCase().replace(/[^a-z0-9]/g, "");
+const stage = $("stage");
+let words = [], lineEls = [], secOf = [], secNames = [], ptr = 0, N = 0, mode = "voice", running = false,
+    rec = null, consumed = 0, timer = null, auto = null, t0 = 0, elapsed = 0, fs = 44, lastLine = null, sy = null, spokenLen = 0;
+
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+function build(text) {
+  stage.textContent = "";
+  words = []; lineEls = []; secOf = []; secNames = [];
+  let si = -1;
+  text.split(/\r?\n/).forEach(raw => {
+    const L = raw.trim();
+    if (!L) return;
+    if (L[0] === "#") {
+      const p = L.replace(/^#+\s*/, "").split("|");
+      si++; secNames.push(p[0].trim() || "Section");
+      const h = document.createElement("div"); h.className = "sechead";
+      h.appendChild(document.createTextNode(p[0].trim()));
+      if (p[1]) { const s = document.createElement("span"); s.className = "mono"; s.textContent = p[1].trim(); h.appendChild(s); }
+      stage.appendChild(h); return;
+    }
+    if (si < 0) { si = 0; secNames.push("Script"); }
+    if (L[0] === "[") {
+      const c = document.createElement("div"); c.className = "cue"; c.textContent = L.replace(/^\[|\]$/g, ""); stage.appendChild(c); return;
+    }
+    const d = document.createElement("p"); d.className = "line"; d._i = words.length;
+    L.split(/\s+/).forEach((w, i, a) => {
+      const s = document.createElement("span"); s.className = "w"; s.textContent = w + (i < a.length - 1 ? " " : "");
+      d.appendChild(s);
+      const n = norm(w);
+      if (n) { words.push({ n, el: s, line: d, r: w }); secOf.push(si); }
+    });
+    d.onclick = () => { ptr = d._i; consumed = spokenLen; render(); };
+    stage.appendChild(d); lineEls.push(d);
+  });
+  N = words.length; ptr = 0; consumed = 0; lastLine = null;
+  render(); window.scrollTo(0, 0);
+}
+
+function fastScroll(el) {
+  const reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
+  const to = Math.max(0, el.getBoundingClientRect().top + scrollY - innerHeight * 0.36), from = scrollY, t = performance.now(), dur = reduce ? 0 : 140;
+  cancelAnimationFrame(sy);
+  (function f(n) { const p = dur ? Math.min(1, (n - t) / dur) : 1; scrollTo(0, from + (to - from) * (1 - Math.pow(1 - p, 3))); if (p < 1) sy = requestAnimationFrame(f); })(t);
+}
+
+function render() {
+  if (!N) { $("sec").textContent = "Empty script"; return; }
+  ptr = Math.min(ptr, N);
+  for (let i = 0; i < N; i++) { const c = i < ptr ? "w read" : (i === ptr ? "w cur" : "w"); if (words[i].el.className !== c) words[i].el.className = c; }
+  const w = words[Math.min(ptr, N - 1)];
+  if (w.line !== lastLine) { if (lastLine) lastLine.classList.remove("active"); w.line.classList.add("active"); lastLine = w.line; fastScroll(w.line); }
+  $("sec").textContent = secNames[secOf[Math.min(ptr, N - 1)]] || "";
+  $("bar").firstChild.style.width = (ptr / N * 100) + "%";
+  if (ptr >= N && running) { $("heard").textContent = "End of speech. Well done."; stop(); }
+}
+
+const fmt = s => { s = Math.floor(s); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); };
+function tick() { const e = elapsed + (running ? (Date.now() - t0) / 1000 : 0); $("clock").textContent = fmt(e) + " / 5:00"; }
+function setStatus(t, c) { const s = $("st"); s.textContent = t; s.className = "mono " + (c || ""); }
+function note(t) { $("note").textContent = t || ""; }
+
+function matchAhead(w) {
+  const lim = w.length <= 3 ? 4 : 18;
+  for (let k = ptr; k < Math.min(ptr + lim + 1, N); k++) {
+    const n = words[k].n;
+    if (n === w || (w.length >= 4 && n.length >= 4 && (n.indexOf(w) === 0 || w.indexOf(n) === 0))) return k + 1;
+  }
+  if (w.length >= 6) for (let j = ptr; j < Math.min(ptr + 46, N); j++) if (words[j].n === w) return j + 1;
+  return -1;
+}
+function feed(spoken) {
+  spokenLen = spoken.length;
+  if (spoken.length < consumed) consumed = spoken.length;
+  for (let i = consumed; i < spoken.length; i++) { const m = matchAhead(spoken[i]); if (m > 0) ptr = m; }
+  consumed = spoken.length; render();
+}
+
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    note("This browser has no speech recognition. Use Chrome or Edge (or Safari 14.1+). Switched to Auto mode.");
+    setMode("auto"); return false;
+  }
+  if (!window.isSecureContext && location.protocol !== "file:") {
+    note("The microphone needs https. Open the https GitHub Pages link instead of http."); return false;
+  }
+  rec = new SR(); rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1; rec.lang = "en-IN";
+  rec.onstart = () => setStatus("Mic listening", "ok");
+  rec.onresult = e => {
+    let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript + " ";
+    const sp = t.toLowerCase().split(/\s+/).map(norm).filter(Boolean);
+    $("heard").textContent = "Heard: " + sp.slice(-8).join(" "); feed(sp);
+  };
+  rec.onerror = e => {
+    const m = {
+      "not-allowed": "Microphone blocked. Click the lock icon in the address bar, set Microphone to Allow, then press Start.",
+      "service-not-allowed": "Speech service blocked by the browser. Use Chrome or Edge and allow the microphone.",
+      "audio-capture": "No microphone found. Plug one in or pick it in your system sound settings.",
+      "network": "Chrome speech recognition needs an internet connection."
+    }[e.error];
+    if (m) { stop(); setStatus("Mic error", "bad"); note(m); }
+  };
+  rec.onend = () => { consumed = 0; spokenLen = 0; if (running && mode === "voice") setTimeout(() => { try { rec.start(); } catch (x) {} }, 80); };
+  try { rec.start(); note(""); return true; } catch (x) { note("Could not start the microphone: " + x.message); return false; }
+}
+
+function autoStep() {
+  if (!running || mode !== "auto") return;
+  ptr = Math.min(ptr + 1, N); render();
+  if (ptr >= N) return;
+  const r = words[ptr - 1].r, base = 60000 / $("wpm").value;
+  let d = base * (0.7 + Math.min(r.length, 10) * 0.06);
+  if (/[.!?]$/.test(r)) d += base * 2.2; else if (/[,:;]$/.test(r)) d += base * 0.9;
+  auto = setTimeout(autoStep, d);
+}
+
+function start() {
+  if (!N) return;
+  if (ptr >= N) { ptr = 0; elapsed = 0; consumed = 0; }
+  if (mode === "voice" && !startVoice() && mode === "voice") return;
+  if (mode === "auto") { clearTimeout(auto); auto = setTimeout(autoStep, 250); setStatus("Auto pace", "ok"); }
+  running = true; t0 = Date.now(); clearInterval(timer); timer = setInterval(tick, 500); sync(); render();
+}
+function stop() {
+  if (running) elapsed += (Date.now() - t0) / 1000;
+  running = false; clearTimeout(auto); clearInterval(timer);
+  if (rec) { rec.onend = null; try { rec.abort(); } catch (x) {} }
+  tick(); sync(); setStatus("Mic idle", "");
+}
+function sync() { const g = $("go"); g.textContent = running ? "Pause" : "Start"; g.className = running ? "run" : ""; }
+function setMode(m) {
+  const was = running; if (was) stop();
+  mode = m; $("mVoice").className = m === "voice" ? "on" : ""; $("mAuto").className = m === "auto" ? "on" : ""; $("spd").hidden = m !== "auto";
+  if (m === "auto") $("heard").textContent = "Auto mode: scrolls at a steady human pace. Tap any line to jump there.";
+  if (was) start();
+}
+function size(d) { fs = Math.max(24, Math.min(80, fs + d)); document.documentElement.style.setProperty("--fs", fs + "px"); if (lastLine) fastScroll(lastLine); }
+function jump(dir) {
+  if (!N) return; const cur = words[Math.min(ptr, N - 1)].line; let i = lineEls.indexOf(cur) + dir;
+  i = Math.max(0, Math.min(lineEls.length - 1, i)); ptr = lineEls[i]._i; consumed = spokenLen; render();
+}
+
+$("go").onclick = () => running ? stop() : start();
+$("mVoice").onclick = () => setMode("voice");
+$("mAuto").onclick = () => setMode("auto");
+$("wpm").oninput = function () { $("wv").textContent = this.value; };
+$("minus").onclick = () => size(-4); $("plus").onclick = () => size(4);
+$("mir").onclick = function () { document.body.classList.toggle("mirror"); this.classList.toggle("on"); };
+$("rst").onclick = () => { stop(); ptr = 0; consumed = 0; elapsed = 0; if (lastLine) lastLine.classList.remove("active"); lastLine = null; render(); scrollTo({ top: 0 }); $("heard").textContent = "Reset. Press Start, then read aloud."; tick(); };
+$("edit").onclick = () => { if (running) stop(); $("src").value = store("tp_script") || DEFAULT_SCRIPT; $("ed").showModal(); };
+$("save").onclick = () => { const v = $("src").value; store("tp_script", v); $("ed").close(); elapsed = 0; tick(); build(v); };
+$("def").onclick = () => { $("src").value = DEFAULT_SCRIPT; };
+$("close").onclick = () => $("ed").close();
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "TEXTAREA" || $("ed").open) return;
+  if (e.code === "Space") { e.preventDefault(); running ? stop() : start(); }
+  else if (e.code === "ArrowDown") { e.preventDefault(); jump(1); }
+  else if (e.code === "ArrowUp") { e.preventDefault(); jump(-1); }
+  else if (e.key === "+" || e.key === "=") size(4);
+  else if (e.key === "-") size(-4);
+});
+
+build(store("tp_script") || DEFAULT_SCRIPT);
+</script>
+</body>
+</html>

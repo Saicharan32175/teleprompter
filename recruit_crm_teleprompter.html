@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Recruit CRM Teleprompter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0e1116;--panel:#171b23;--read:#4b5566;--ahead:#e9edf4;--live:#ffd166;--cue:#7cc4ff;--line:#262c38;--fs:44px;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ahead);font-family:"Instrument Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+header{position:fixed;top:0;left:0;right:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#sec{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#clock{font-size:15px;color:var(--live)}
+#bar{height:3px;background:var(--line);margin-top:8px;border-radius:2px;overflow:hidden}
+#bar i{display:block;height:100%;width:0;background:var(--live);transition:width .3s}
+#stage{padding:96px 22px 55vh;max-width:900px;margin:0 auto}
+.sechead{margin:60vh 0 22px;color:var(--cue);font-size:15px;font-weight:700;letter-spacing:.02em}
+.sechead:first-child{margin-top:34vh}
+.sechead span{display:block;color:var(--read);font-weight:500;margin-top:2px}
+.line{font-size:var(--fs);line-height:1.32;font-weight:700;margin:0 0 .55em;color:var(--ahead);opacity:.55;transition:opacity .1s}
+.line.active{opacity:1}
+.line .w.read{color:var(--read)}
+.line .w.cur{color:var(--live)}
+.cue{display:inline-block;margin:6px 0 26px;padding:6px 12px;border:1px dashed var(--cue);border-radius:6px;color:var(--cue);font-size:16px;font-weight:500}
+.mirror #stage{transform:scaleX(-1)}
+footer{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--panel);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+#heard{font-size:13px;color:var(--read);min-height:18px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-weight:700;font-size:14px;color:var(--ahead);background:#222937;border:1px solid var(--line);border-radius:8px;padding:9px 13px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
+button.on{background:var(--live);color:#14171d;border-color:var(--live)}
+#go{background:#2f9e6b;border-color:#2f9e6b;min-width:92px}
+#go.run{background:#d9534f;border-color:#d9534f}
+label{font-size:13px;color:var(--read);display:flex;align-items:center;gap:6px}
+input[type=range]{width:90px;accent-color:var(--live)}
+#note{font-size:12px;color:var(--live);margin-top:6px;min-height:16px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="row"><div id="sec">Ready</div><div id="clock" class="mono">0:00 / 5:00</div></div>
+  <div id="bar"><i></i></div>
+</header>
+
+<main id="stage"></main>
+
+<footer>
+  <div id="heard">Press Start, then read aloud. Lines follow your voice.</div>
+  <div class="ctl">
+    <button id="go">Start</button>
+    <button id="mVoice" class="on">Voice</button>
+    <button id="mAuto">Auto</button>
+    <button id="minus" aria-label="Smaller text">A−</button>
+    <button id="plus" aria-label="Larger text">A+</button>
+    <button id="mir">Mirror</button>
+    <button id="rst">Reset</button>
+    <label id="spd" hidden>Pace <input id="wpm" type="range" min="100" max="260" value="170"><span id="wv" class="mono">170</span></label>
+  </div>
+  <div id="note"></div>
+</footer>
+
+<script>
+var S=[
+{t:"Introduction",time:"0:00 – 0:40",lines:[
+"Good morning, everyone.",
+"Today, I am going to explain two useful features of Recruit CRM: the AI Candidate Summary Generator and Sequencing.",
+"Before we get into the features, let us first understand what Recruit CRM actually does.",
+"Recruit CRM is a platform that helps companies and recruitment agencies manage their hiring process.",
+"It brings candidate details, resumes, job openings, and communication together in one place.",
+"Now, let us see how these two features make a recruiter’s daily work easier."]},
+{t:"AI Candidate Summary Generator",time:"0:40 – 2:30",lines:[
+"Let us begin with the AI Candidate Summary Generator.",
+"Imagine you are a recruiter at a software company, and you have received 100 resumes for a Java Developer position.",
+"Going through every resume one by one, checking skills, experience, and qualifications, takes a great deal of time.",
+"And sometimes, with so many resumes to review, recruiters may even miss important details.",
+"To solve this problem, Recruit CRM provides the AI Candidate Summary Generator.",
+"This feature uses AI to create a short, easy-to-understand summary of a candidate’s profile, using the information already available.",
+"[Show the candidate profile on screen]",
+"For example, suppose a candidate has two years of experience in Java, Spring Boot, MySQL, and REST APIs.",
+"Instead of reading the complete resume every time, the recruiter can use the AI-generated summary to quickly understand the candidate’s background, skills, and experience.",
+"This makes the screening process much easier.",
+"Here is another example. Suppose a recruiter needs to compare two candidates for the same position.",
+"One candidate may have more experience in Java, while the other may have stronger knowledge of databases.",
+"The summary helps the recruiter quickly identify these differences and decide which candidate should move on to the next round.",
+"The main advantage of this feature is that it saves time, reduces manual work, and helps recruiters understand candidate profiles more easily.",
+"Of course, the recruiter should still verify the information against the original resume before making a final decision."]},
+{t:"Sequencing",time:"2:30 – 4:30",lines:[
+"Now, let us move on to our second feature: Sequencing.",
+"We all know that communication is very important in recruitment.",
+"Imagine a recruiter finds a suitable candidate for a software developer position and sends an email asking whether the candidate is interested in an interview.",
+"But what happens if the candidate does not reply?",
+"The recruiter has to remember to send another email after some time.",
+"And when they are handling 50 or 100 candidates, following up with everyone manually becomes very difficult.",
+"This is where Sequencing becomes useful.",
+"Sequencing helps recruiters organize a series of follow-up communications and automate scheduled emails.",
+"[Show the Sequencing feature on screen]",
+"For example, a recruiter can plan a simple three-step email sequence.",
+"First, send an email introducing the job opportunity.",
+"Second, if the candidate does not respond, send a follow-up email after two days.",
+"Third, send another reminder after a few more days, if appropriate.",
+"This way, recruiters do not have to remember every follow-up manually.",
+"Let us take one more example. Suppose a company is hiring 20 software developers.",
+"The recruiter has to contact many candidates and keep track of their responses.",
+"Using Sequencing, the recruiter can organize the whole communication process and save time, instead of sending every follow-up individually.",
+"This helps recruiters stay connected with candidates and reduces the chances of missing important follow-ups.",
+"The main benefits are better communication, less manual work, and more organized recruitment."]},
+{t:"Conclusion",time:"4:30 – 5:00",lines:[
+"So, to conclude, these are the two features I wanted to explain today.",
+"The AI Candidate Summary Generator helps recruiters understand candidate profiles quickly, while Sequencing helps them manage follow-up communication more efficiently.",
+"In other words, AI helps recruiters identify suitable candidates faster, and Sequencing helps them stay connected with those candidates.",
+"Both features reduce manual work and make the recruitment process smoother.",
+"That is all from my side. Thank you for your time!"]}
+];
+
+var $=function(i){return document.getElementById(i)};
+var stage=$("stage"),words=[],lineEls=[],secOf=[],ptr=0,mode="voice",running=false,rec=null,consumed=0,timer=null,auto=null,t0=0,elapsed=0,fs=44;
+function norm(w){return w.toLowerCase().replace(/[^a-z0-9]/g,"")}
+
+S.forEach(function(sec,si){
+  var h=document.createElement("div");h.className="sechead";
+  h.innerHTML=sec.t+"<span class='mono'>"+sec.time+"</span>";stage.appendChild(h);
+  sec.lines.forEach(function(L){
+    if(L.charAt(0)==="["){var c=document.createElement("div");c.className="cue";c.textContent=L.slice(1,-1);stage.appendChild(c);return}
+    var d=document.createElement("p");d.className="line";
+    L.split(" ").forEach(function(w,i,a){
+      var s=document.createElement("span");s.className="w";s.textContent=w+(i<a.length-1?" ":"");
+      d.appendChild(s);var n=norm(w);
+      if(n){words.push({n:n,el:s,line:d,r:w});secOf.push(si)}
+    });
+    d.onclick=function(){var k=words.findIndex(function(x){return x.line===d});if(k>=0){ptr=k;consumed=currentSpokenLen;render()}};
+    stage.appendChild(d);lineEls.push(d);
+  });
+});
+var N=words.length,currentSpokenLen=0,lastLine=null;
+
+function render(){
+  for(var i=0;i<N;i++){var c=i<ptr?"w read":(i===ptr?"w cur":"w");if(words[i].el.className!==c)words[i].el.className=c}
+  var w=words[Math.min(ptr,N-1)],ln=w.line;
+  if(ln!==lastLine){if(lastLine)lastLine.classList.remove("active");ln.classList.add("active");lastLine=ln;
+    fastScroll(ln)}
+  $("sec").textContent=S[secOf[Math.min(ptr,N-1)]].t;
+  $("bar").firstChild.style.width=(ptr/N*100)+"%";
+  if(ptr>=N){$("heard").textContent="End of speech. Well done.";stop()}
+}
+var sy=null;
+function fastScroll(el){
+  var to=Math.max(0,el.getBoundingClientRect().top+scrollY-innerHeight*0.36),from=scrollY,t=performance.now(),dur=matchMedia("(prefers-reduced-motion:reduce)").matches?0:140;
+  cancelAnimationFrame(sy);
+  (function f(n){var p=dur?Math.min(1,(n-t)/dur):1;scrollTo(0,from+(to-from)*(1-Math.pow(1-p,3)));if(p<1)sy=requestAnimationFrame(f)})(t);
+}
+function autoStep(){
+  if(!running||mode!=="auto")return;
+  ptr=Math.min(ptr+1,N);render();
+  if(ptr>=N)return;
+  var r=words[ptr-1].r,base=60000/$("wpm").value,d=base*(0.7+Math.min(r.length,10)*0.06);
+  if(/[.!?]$/.test(r))d+=base*2.2;else if(/[,:;]$/.test(r))d+=base*0.9;
+  auto=setTimeout(autoStep,d);
+}
+function fmt(s){s=Math.floor(s);return Math.floor(s/60)+":"+("0"+s%60).slice(-2)}
+function tick(){var e=elapsed+(running?(Date.now()-t0)/1000:0);$("clock").textContent=fmt(e)+" / 5:00"}
+
+function matchAhead(w){
+  var lim=w.length<=3?4:18;
+  for(var k=ptr;k<Math.min(ptr+lim+1,N);k++){var n=words[k].n;
+    if(n===w||(w.length>=4&&n.length>=4&&(n.indexOf(w)===0||w.indexOf(n)===0)))return k+1}
+  if(w.length>=6){for(var j=ptr;j<Math.min(ptr+46,N);j++)if(words[j].n===w)return j+1}
+  return -1;
+}
+function feed(spoken){
+  currentSpokenLen=spoken.length;
+  if(spoken.length<consumed)consumed=spoken.length;
+  for(var i=consumed;i<spoken.length;i++){var m=matchAhead(spoken[i]);if(m>0)ptr=m}
+  consumed=spoken.length;render();
+}
+
+function startVoice(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){$("note").textContent="Speech detection is not supported in this browser. Use Chrome or Safari, or switch to Auto.";setMode("auto");return false}
+  rec=new SR();rec.continuous=true;rec.interimResults=true;rec.lang="en-IN";
+  rec.onresult=function(e){var t="";for(var i=0;i<e.results.length;i++)t+=e.results[i][0].transcript+" ";
+    var sp=t.toLowerCase().split(/\s+/).map(norm).filter(Boolean);
+    $("heard").textContent="Heard: "+sp.slice(-8).join(" ");feed(sp)};
+  rec.onerror=function(e){if(e.error==="not-allowed"||e.error==="service-not-allowed"){
+    setMode("auto");$("note").textContent="This preview is not allowed to use the microphone, so Auto mode started instead. For voice, open the downloaded file in Chrome and allow the mic."}};
+  rec.onend=function(){consumed=0;if(running&&mode==="voice"){try{rec.start()}catch(x){}}};
+  try{rec.start();$("note").textContent="";return true}catch(x){return false}
+}
+function start(){
+  if(ptr>=N){ptr=0;elapsed=0}
+  if(mode==="voice"){if(!startVoice())if(mode==="voice")return}
+  if(mode==="auto"){clearTimeout(auto);auto=setTimeout(autoStep,250)}
+  running=true;t0=Date.now();clearInterval(timer);timer=setInterval(tick,500);sync();render();
+}
+function stop(){
+  if(running)elapsed+=(Date.now()-t0)/1000;running=false;
+  clearTimeout(auto);clearInterval(timer);if(rec){rec.onend=null;try{rec.stop()}catch(x){}}tick();sync();
+}
+function sync(){var g=$("go");g.textContent=running?"Pause":"Start";g.className=running?"run":""}
+function setMode(m){var was=running;if(was)stop();mode=m;
+  $("mVoice").className=m==="voice"?"on":"";$("mAuto").className=m==="auto"?"on":"";$("spd").hidden=m!=="auto";
+  if(m==="auto")$("heard").textContent="Auto mode: scrolls at a steady pace. Tap any line to jump there.";
+  if(was)start()}
+$("go").onclick=function(){running?stop():start()};
+$("mVoice").onclick=function(){setMode("voice")};
+$("mAuto").onclick=function(){setMode("auto")};
+$("wpm").oninput=function(){$("wv").textContent=this.value};
+function size(d){fs=Math.max(24,Math.min(80,fs+d));document.documentElement.style.setProperty("--fs",fs+"px");if(lastLine)lastLine.scrollIntoView({block:"center"})}
+$("minus").onclick=function(){size(-4)};$("plus").onclick=function(){size(4)};
+$("mir").onclick=function(){document.body.classList.toggle("mirror");this.classList.toggle("on")};
+$("rst").onclick=function(){stop();ptr=0;consumed=0;elapsed=0;lastLine=null;if(lineEls[0])lineEls[0].classList.remove("active");render();scrollTo({top:0,behavior:"smooth"});$("heard").textContent="Reset. Press Start, then read aloud.";tick()};
+render();window.scrollTo(0,0);
+</script>
+</body>
+</html>
